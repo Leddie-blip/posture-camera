@@ -58,23 +58,51 @@ export default function Home() {
   const capturePhoto = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-
+  
     if (!video || !canvas) return;
-
-    const width = video.videoWidth;
-    const height = video.videoHeight;
-
-    canvas.width = width;
-    canvas.height = height;
-
+  
+    const canvasWidth = 720;
+    const canvasHeight = 1280;
+  
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+  
     const ctx = canvas.getContext("2d");
-
     if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0, width, height);
-
-    drawGrid(ctx, width, height);
-
+  
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+  
+    const videoRatio = videoWidth / videoHeight;
+    const canvasRatio = canvasWidth / canvasHeight;
+  
+    let sx = 0;
+    let sy = 0;
+    let sWidth = videoWidth;
+    let sHeight = videoHeight;
+  
+    if (videoRatio > canvasRatio) {
+      sWidth = videoHeight * canvasRatio;
+      sx = (videoWidth - sWidth) / 2;
+    } else {
+      sHeight = videoWidth / canvasRatio;
+      sy = (videoHeight - sHeight) / 2;
+    }
+  
+    ctx.drawImage(
+      video,
+      sx,
+      sy,
+      sWidth,
+      sHeight,
+      0,
+      0,
+      canvasWidth,
+      canvasHeight
+    );
+  
+    drawGrid(ctx, canvasWidth, canvasHeight);
+  
     const imageData = canvas.toDataURL("image/png");
     setCapturedImage(imageData);
   };
@@ -113,13 +141,28 @@ export default function Home() {
     ctx.stroke();
   };
 
-  const downloadPhoto = () => {
+  const downloadPhoto = async () => {
     if (!capturedImage) return;
-
-    const link = document.createElement("a");
-    link.href = capturedImage;
-    link.download = "posture-photo.png";
-    link.click();
+  
+    const response = await fetch(capturedImage);
+    const blob = await response.blob();
+  
+    const file = new File([blob], "posture-photo.png", {
+      type: "image/png",
+    });
+  
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: "Posture Photo",
+        text: "체형평가 사진",
+      });
+    } else {
+      const link = document.createElement("a");
+      link.href = capturedImage;
+      link.download = "posture-photo.png";
+      link.click();
+    }
   };
 
   return (
@@ -173,6 +216,14 @@ export default function Home() {
         >
           사진 저장
         </button>
+        {capturedImage && (
+  <button
+    onClick={() => setCapturedImage(null)}
+    className="bg-zinc-700 hover:bg-zinc-600 px-5 py-3 rounded-xl"
+  >
+    다시 촬영
+  </button>
+)}
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
